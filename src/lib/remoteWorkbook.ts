@@ -31,6 +31,24 @@ const LAB_CONTEXT_CHARS = 280;
 const PAGE_TIMEOUT_MS = 20000;
 const DOWNLOAD_TIMEOUT_MS = 60000;
 
+/**
+ * Enlaces de la publicación vigente (agosto 2026). Se usan solo en la web si
+ * el proxy de Netlify no puede consultar la página de la FP-UNA: las descargas
+ * de Google Sheets sí permiten CORS desde el navegador.
+ */
+const FALLBACK_PLAN_LINKS: PlanLink[] = [
+  {
+    sourceUrl:
+      'https://docs.google.com/spreadsheets/d/1B4Uk_8w8Vq1ooVVBgWicU2s7jDEoPG_k/export?format=xlsx',
+    label: 'Planes de estudios 2026 (nuevos)',
+  },
+  {
+    sourceUrl:
+      'https://docs.google.com/spreadsheets/d/1PJozhltj9y8hf04Lc8tk5kxN4Hy4p4y1/export?format=xlsx',
+    label: 'Planes de estudios anteriores',
+  },
+];
+
 function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
   return new Promise<T>((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error(message)), ms);
@@ -187,6 +205,19 @@ function base64Size(b64: string): number {
  * actual (se omite la planificación de laboratorio).
  */
 export async function discoverCurrentPlanLinks(): Promise<PlanLink[]> {
+  try {
+    return await fetchCurrentPlanLinks();
+  } catch (e) {
+    if (Platform.OS !== 'web') throw e;
+    console.warn(
+      '[Excel] No se pudo consultar la página de la FP-UNA; se usan los enlaces de respaldo:',
+      e
+    );
+    return FALLBACK_PLAN_LINKS;
+  }
+}
+
+async function fetchCurrentPlanLinks(): Promise<PlanLink[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PAGE_TIMEOUT_MS);
   try {
@@ -199,8 +230,14 @@ export async function discoverCurrentPlanLinks(): Promise<PlanLink[]> {
     }
     const html = await response.text();
     const section = findCurrentPeriodSection(html);
-    if (!section) return [];
-    return findPlanLinks(section);
+    if (!section) {
+      return Platform.OS === 'web' ? FALLBACK_PLAN_LINKS : [];
+    }
+    const links = findPlanLinks(section);
+    if (!links.length && Platform.OS === 'web') {
+      return FALLBACK_PLAN_LINKS;
+    }
+    return links;
   } finally {
     clearTimeout(timer);
   }
