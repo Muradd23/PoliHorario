@@ -135,7 +135,7 @@ export default function App() {
       if (result.canceled || !result.assets?.length) return;
       const asset = result.assets[0];
       console.log(`[Excel] Archivo seleccionado: ${asset.name || asset.uri}`);
-      const b64 = await fileUriToBase64(asset.uri);
+      const b64 = await fileUriToBase64(asset.uri, asset.file);
       await loadExcelBase64(b64, asset.name || 'seleccionada');
     } catch (e) {
       console.error('[Excel] Error al seleccionar o leer el archivo:', e);
@@ -160,7 +160,7 @@ export default function App() {
       console.log(`[Comprobante] Iniciando lectura de "${name}"...`);
       setPdfName(name);
       setStatus('Extrayendo texto del PDF...');
-      const b64 = await fileUriToBase64(asset.uri);
+      const b64 = await fileUriToBase64(asset.uri, asset.file);
       setPdfBase64(b64);
     } catch (e) {
       console.error('[Comprobante] Error al seleccionar o leer el PDF:', e);

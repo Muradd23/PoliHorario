@@ -1,10 +1,22 @@
+import { Platform } from 'react-native';
 import * as FileSystem from 'expo-file-system/legacy';
+import { arrayBufferToBase64 } from './base64';
 
 /**
  * Página oficial de la FP-UNA donde se publican (y actualizan) los horarios.
  */
 export const PLAN_PAGE_URL =
   'https://www.pol.una.py/academico/horarios-de-clases-y-examenes/';
+
+/**
+ * En la web la página de la FP-UNA no envía cabeceras CORS, por lo que se
+ * consulta a través del proxy configurado en netlify.toml.
+ */
+const WEB_PAGE_PROXY_URL = '/api/planificaciones';
+
+function planPageUrl(): string {
+  return Platform.OS === 'web' ? WEB_PAGE_PROXY_URL : PLAN_PAGE_URL;
+}
 
 const PERIOD_HEADING_RE =
   /<h[1-6][^>]*>[\s\S]{0,120}?Periodo Acad[eé]mico\s*\d{4}/gi;
@@ -178,7 +190,7 @@ export async function discoverCurrentPlanLinks(): Promise<PlanLink[]> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PAGE_TIMEOUT_MS);
   try {
-    const response = await fetch(PLAN_PAGE_URL, {
+    const response = await fetch(planPageUrl(), {
       headers: { 'Cache-Control': 'no-cache' },
       signal: controller.signal,
     });
@@ -194,7 +206,52 @@ export async function discoverCurrentPlanLinks(): Promise<PlanLink[]> {
   }
 }
 
+async function downloadPlanFromWeb(link: PlanLink): Promise<RemoteWorkbook> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT_MS);
+  try {
+    const response = await fetch(link.sourceUrl, {
+      headers: { 'Cache-Control': 'no-cache' },
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      throw new Error(`la descarga respondió con estado ${response.status}`);
+    }
+
+    const buffer = await response.arrayBuffer();
+    const base64 = arrayBufferToBase64(buffer);
+    const bytes = buffer.byteLength;
+    const mimeType = response.headers.get('content-type') || 'tipo desconocido';
+
+    if (!base64.startsWith('UEsDB')) {
+      throw new Error(
+        `el archivo descargado no es un .xlsx válido (firma ZIP ausente, ` +
+          `${bytes} bytes, tipo ${mimeType})`
+      );
+    }
+
+    console.log(
+      `[Excel] Descarga OK (${link.label}): HTTP ${response.status}, ` +
+        `${mimeType}, ${bytes} bytes, XLSX verificado. ${link.sourceUrl}`
+    );
+
+    return { base64, label: link.label, sourceUrl: link.sourceUrl };
+  } catch (e) {
+    if (e instanceof Error && e.name === 'AbortError') {
+      throw new Error(`la descarga de "${link.label}" tardó demasiado`);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function downloadPlan(link: PlanLink, index: number): Promise<RemoteWorkbook> {
+  if (Platform.OS === 'web') {
+    return downloadPlanFromWeb(link);
+  }
+
   const cacheDir = FileSystem.cacheDirectory ?? '';
   const target = `${cacheDir}planificacion-web-${Date.now()}-${index}.xlsx`;
 

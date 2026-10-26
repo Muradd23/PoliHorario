@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "expo_scaffold",
-    "slug": "expo_scaffold",
+    "name": "PoliHorario",
+    "slug": "polihorario",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

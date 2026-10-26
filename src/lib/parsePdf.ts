@@ -20,10 +20,22 @@ export function buildPdfExtractionHtml(opts: {
 <body>
 <script>
 (function () {
-  function fail(msg) {
+  function post(payload) {
+    var msg = JSON.stringify(payload);
     try {
-      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error', message: String(msg) }));
+      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        window.ReactNativeWebView.postMessage(msg);
+        return;
+      }
     } catch (e) {}
+    try {
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage(msg, '*');
+      }
+    } catch (e) {}
+  }
+  function fail(msg) {
+    post({ type: 'error', message: String(msg) });
   }
   try {
     var libScript = document.createElement('script');
@@ -54,7 +66,7 @@ export function buildPdfExtractionHtml(opts: {
         return Promise.all(tasks);
       })
       .then(function (pages) {
-        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'success', text: pages.join('\\n') }));
+        post({ type: 'success', text: pages.join('\\n') });
       })
       .catch(function (err) {
         fail((err && err.message) ? err.message : err);

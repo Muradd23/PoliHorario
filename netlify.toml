@@ -1,0 +1,20 @@
+[build]
+  command = "npx expo export -p web"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# La página de la FP-UNA no envía cabeceras CORS, así que la app la consulta
+# a través de este proxy del propio sitio.
+[[redirects]]
+  from = "/api/planificaciones"
+  to = "https://www.pol.una.py/academico/horarios-de-clases-y-examenes/"
+  status = 200
+  force = true
+
+# La app es una SPA: cualquier ruta debe servir index.html.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
