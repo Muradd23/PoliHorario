@@ -2,7 +2,13 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { MatchedSubject } from '../types';
 
-export default function SubjectCard({ subject }: { subject: MatchedSubject }) {
+export default function SubjectCard({
+  subject,
+  onSelectSection,
+}: {
+  subject: MatchedSubject;
+  onSelectSection?: (subjectName: string, section: string) => void;
+}) {
   const initialIndex = Math.max(
     0,
     subject.entries.findIndex((entry) => entry.seccion === subject.defaultSection)
@@ -52,7 +58,10 @@ export default function SubjectCard({ subject }: { subject: MatchedSubject }) {
                 return (
                   <TouchableOpacity
                     key={`${entry.seccion}-${index}`}
-                    onPress={() => setSelectedIndex(index)}
+                    onPress={() => {
+                      setSelectedIndex(index);
+                      onSelectSection?.(subject.name, entry.seccion);
+                    }}
                     style={[styles.chip, active && styles.chipActive]}
                   >
                     <Text style={[styles.chipText, active && styles.chipTextActive]}>

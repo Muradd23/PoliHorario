@@ -14,9 +14,15 @@ export interface ResultScreenProps {
   match: MatchResult;
   pdfName: string;
   onBack: () => void;
+  onSelectSection: (subjectName: string, section: string) => void;
 }
 
-export default function ResultScreen({ match, pdfName, onBack }: ResultScreenProps) {
+export default function ResultScreen({
+  match,
+  pdfName,
+  onBack,
+  onSelectSection,
+}: ResultScreenProps) {
   const insets = useSafeAreaInsets();
   return (
     <View style={styles.container}>
@@ -45,6 +51,7 @@ export default function ResultScreen({ match, pdfName, onBack }: ResultScreenPro
           <SubjectCard
             key={`${s.name}|${s.receiptTurno ?? ''}|${s.receiptSeccion ?? ''}|${s.defaultSection ?? ''}`}
             subject={s}
+            onSelectSection={onSelectSection}
           />
         ))}
       </ScrollView>

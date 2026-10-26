@@ -122,8 +122,14 @@ function inferSectionsByTurno(pending: PendingMatch[]): Map<string, string> {
 }
 
 export function matchSubjects(parsed: ParsedWorkbook, text: string): MatchResult {
-  const rows = extractReceiptRows(text);
-  const career = detectCareer(text);
+  return matchReceiptRows(parsed, extractReceiptRows(text), detectCareer(text));
+}
+
+export function matchReceiptRows(
+  parsed: ParsedWorkbook,
+  rows: ReceiptRow[],
+  career: DetectedCareer | null
+): MatchResult {
   const bySubject = new Map<string, SubjectEntry[]>();
   for (const e of parsed.entries) {
     const key = normalize(e.subject);

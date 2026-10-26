@@ -43,3 +43,5 @@ export interface ParsedWorkbook {
   uniqueSubjects: { name: string; normalized: string }[];
   careerNames: { sigla: string; name: string; normalized: string }[];
 }
+
+export type Stage = 'pick' | 'result';
