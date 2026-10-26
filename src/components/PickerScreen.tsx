@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export interface PickerScreenProps {
   status: string;
@@ -14,7 +15,7 @@ export interface PickerScreenProps {
   resultReady: boolean;
   onPickPdf: () => void;
   onPickExcel: () => void;
-  onUseBundledExcel: () => void;
+  onRefreshFromWeb: () => void;
   onViewResult: () => void;
 }
 
@@ -25,16 +26,24 @@ export default function PickerScreen({
   resultReady,
   onPickPdf,
   onPickExcel,
-  onUseBundledExcel,
+  onRefreshFromWeb,
   onViewResult,
 }: PickerScreenProps) {
+  const insets = useSafeAreaInsets();
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[
+          styles.content,
+          { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 },
+        ]}
+      >
         <Text style={styles.title}>Estirar Horario</Text>
         <Text style={styles.subtitle}>
-          Seleccioná tu comprobante de inscripción (PDF) y la planificación de horarios (Excel)
-          para ver el horario completo de cada asignatura.
+          Seleccioná tu comprobante de inscripción (PDF). La planificación de horarios se
+          descarga automáticamente desde la página de la FP-UNA, con una copia incluida en la
+          app como respaldo.
         </Text>
 
         <TouchableOpacity style={styles.primaryButton} onPress={onPickPdf}>
@@ -45,8 +54,8 @@ export default function PickerScreen({
           <Text style={styles.secondaryText}>Seleccionar planificación (.xlsx)</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.linkButton} onPress={onUseBundledExcel}>
-          <Text style={styles.linkText}>Usar planificación incluida en la app</Text>
+        <TouchableOpacity style={styles.linkButton} onPress={onRefreshFromWeb}>
+          <Text style={styles.linkText}>Actualizar planificación desde la web</Text>
         </TouchableOpacity>
 
         {status ? <Text style={styles.status}>{status}</Text> : null}
@@ -70,8 +79,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#f4f6f8',
   },
   content: {
-    padding: 24,
-    paddingTop: 80,
+    flexGrow: 1,
+    paddingHorizontal: 24,
+  },
+  scroll: {
+    flex: 1,
   },
   title: {
     fontSize: 28,

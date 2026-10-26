@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MatchResult } from '../lib/match';
 import SubjectCard from './SubjectCard';
 
@@ -16,14 +17,18 @@ export interface ResultScreenProps {
 }
 
 export default function ResultScreen({ match, pdfName, onBack }: ResultScreenProps) {
+  const insets = useSafeAreaInsets();
   return (
     <View style={styles.container}>
-      <View style={styles.topbar}>
+      <View style={[styles.topbar, { paddingTop: insets.top + 8 }]}>
         <TouchableOpacity onPress={onBack} style={styles.backButton}>
           <Text style={styles.backText}>← Volver</Text>
         </TouchableOpacity>
       </View>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 24 }]}
+      >
         <Text style={styles.heading}>Horarios encontrados</Text>
         <Text style={styles.subheading}>{pdfName}</Text>
         {match.career ? (
@@ -37,7 +42,10 @@ export default function ResultScreen({ match, pdfName, onBack }: ResultScreenPro
           {match.subjects.length} asignatura{match.subjects.length === 1 ? '' : 's'} del comprobante
         </Text>
         {match.subjects.map((s) => (
-          <SubjectCard key={s.name} subject={s} />
+          <SubjectCard
+            key={`${s.name}|${s.receiptTurno ?? ''}|${s.receiptSeccion ?? ''}|${s.defaultSection ?? ''}`}
+            subject={s}
+          />
         ))}
       </ScrollView>
     </View>
@@ -48,9 +56,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f4f6f8',
+
+    width:'100%'
   },
   topbar: {
-    paddingTop: 56,
     paddingHorizontal: 16,
     paddingBottom: 8,
     backgroundColor: '#ffffff',
@@ -67,7 +76,12 @@ const styles = StyleSheet.create({
     color: '#0f766e',
     fontWeight: '600',
   },
+  scroll: {
+    flex: 1,
+    height:'100%'
+  },
   content: {
+    flexGrow: 1,
     padding: 16,
   },
   heading: {

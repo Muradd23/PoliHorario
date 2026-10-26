@@ -1,8 +1,27 @@
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { MatchedSubject } from '../types';
 
 export default function SubjectCard({ subject }: { subject: MatchedSubject }) {
+  const initialIndex = Math.max(
+    0,
+    subject.entries.findIndex((entry) => entry.seccion === subject.defaultSection)
+  );
+  const [selectedIndex, setSelectedIndex] = useState(initialIndex);
+  const safeIndex = Math.min(Math.max(selectedIndex, 0), subject.entries.length - 1);
+  const selected = subject.entries[safeIndex];
+  const multiple = subject.entries.length > 1;
+  const sectionUnknown = subject.sectionMatched === false;
+  const receiptTurno = (subject.receiptTurno ?? '').trim().toUpperCase();
+  const hasReceiptTurno = subject.entries.some(
+    (entry) => entry.turno.trim().toUpperCase() === receiptTurno
+  );
+  const distinctTurnos = new Set(
+    subject.entries.map((entry) => entry.turno.trim().toUpperCase())
+  );
+
+  if (!selected) return null;
+
   return (
     <View style={styles.card}>
       <View style={styles.header}>
@@ -11,40 +30,73 @@ export default function SubjectCard({ subject }: { subject: MatchedSubject }) {
           {subject.name}
         </Text>
         <Text style={styles.subtitle}>
-          {subject.entries.length === 1 ? '1 sección' : `${subject.entries.length} secciones`}
+          Sección {selected.seccion} · Turno {selected.turno}
+          {multiple ? ` · ${subject.entries.length} publicadas` : ''}
         </Text>
       </View>
-      {subject.entries.map((entry, i) => (
-        <View key={i} style={styles.entry}>
-          <Text style={styles.meta}>
-            Carrera: {entry.carrera} · Nivel: {entry.nivel} · Grupo: {entry.grupo} · Turno:{' '}
-            {entry.turno} · Sección: {entry.seccion}
+
+      {sectionUnknown ? (
+        <View style={styles.hint}>
+          <Text style={styles.hintText}>
+            El comprobante indica Turno {subject.receiptTurno} / Sección{' '}
+            {subject.receiptSeccion}.{' '}
+            {hasReceiptTurno
+              ? 'Esa sección no figura en la planificación actual'
+              : 'La planificación actual no publica horarios para ese turno'}
+            {multiple ? '; elegí la tuya:' : '.'}
           </Text>
-          {entry.clases.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Clases</Text>
-              {entry.clases.map((c, j) => (
-                <Text key={j} style={styles.row}>
-                  {c.day}: {c.time}
-                  {c.aula ? `  ·  Aula ${c.aula}` : ''}
-                </Text>
-              ))}
+          {multiple ? (
+            <View style={styles.chips}>
+              {subject.entries.map((entry, index) => {
+                const active = index === safeIndex;
+                return (
+                  <TouchableOpacity
+                    key={`${entry.seccion}-${index}`}
+                    onPress={() => setSelectedIndex(index)}
+                    style={[styles.chip, active && styles.chipActive]}
+                  >
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>
+                      {distinctTurnos.size > 1
+                        ? `${entry.turno}/${entry.seccion}`
+                        : entry.seccion}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
-          )}
-          {entry.examenes.length > 0 && (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Exámenes</Text>
-              {entry.examenes.map((x, j) => (
-                <Text key={j} style={styles.row}>
-                  {x.label}: {x.date}
-                  {x.time ? ` ${x.time}` : ''}
-                  {x.aula ? `  ·  Aula ${x.aula}` : ''}
-                </Text>
-              ))}
-            </View>
-          )}
+          ) : null}
         </View>
-      ))}
+      ) : null}
+
+      <View style={styles.entry}>
+        <Text style={styles.meta}>
+          Carrera: {selected.carrera} · Nivel: {selected.nivel} · Grupo: {selected.grupo} ·
+          Turno: {selected.turno} · Sección: {selected.seccion}
+        </Text>
+        {selected.clases.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Clases</Text>
+            {selected.clases.map((c, j) => (
+              <Text key={j} style={styles.row}>
+                {c.day}: {c.time}
+                {c.aula ? `  ·  Aula ${c.aula}` : ''}
+              </Text>
+            ))}
+          </View>
+        )}
+        {selected.examenes.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Exámenes</Text>
+            {selected.examenes.map((x, j) => (
+              <Text key={j} style={styles.row}>
+                {x.label}: {x.date}
+                {x.time ? ` ${x.time}` : ''}
+                {x.aula ? `  ·  Aula ${x.aula}` : ''}
+              </Text>
+            ))}
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -70,6 +122,45 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#6b7684',
     marginTop: 2,
+  },
+  hint: {
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  hintText: {
+    fontSize: 12,
+    lineHeight: 17,
+    color: '#92400e',
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 10,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#cbd5e1',
+    backgroundColor: '#f8fafc',
+  },
+  chipActive: {
+    backgroundColor: '#0f766e',
+    borderColor: '#0f766e',
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#334155',
+  },
+  chipTextActive: {
+    color: '#ffffff',
   },
   entry: {
     borderTopWidth: 1,

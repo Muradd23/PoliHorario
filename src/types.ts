@@ -29,6 +29,13 @@ export interface MatchedSubject {
   name: string;
   semesterFromReceipt?: string;
   entries: SubjectEntry[];
+  /** Turno y sección tal como figuran en el comprobante. */
+  receiptTurno?: string;
+  receiptSeccion?: string;
+  /** true si la sección del comprobante existe en la planificación. */
+  sectionMatched?: boolean;
+  /** Sección que conviene mostrar primero cuando el comprobante no la precisa. */
+  defaultSection?: string;
 }
 
 export interface ParsedWorkbook {

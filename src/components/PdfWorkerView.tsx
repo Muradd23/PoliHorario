@@ -48,7 +48,7 @@ export default function PdfWorkerView({ base64, onText, onError }: PdfWorkerView
     <WebView
       originWhitelist={['*']}
       source={{ html }}
-      style={styles.hidden}
+      style={styles.fill}
       javaScriptEnabled
       domStorageEnabled
       textZoom={100}
@@ -69,11 +69,7 @@ export default function PdfWorkerView({ base64, onText, onError }: PdfWorkerView
 }
 
 const styles = StyleSheet.create({
-  hidden: {
-    position: 'absolute',
-    width: 1,
-    height: 1,
-    opacity: 0.01,
-    backgroundColor: 'transparent',
+  fill: {
+    flex: 1,
   },
 });
