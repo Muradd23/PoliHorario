@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -9,6 +9,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { MatchResult } from '../lib/match';
 import SubjectCard from './SubjectCard';
+import ExamCalendar from './ExamCalendar';
 
 export interface ResultScreenProps {
   match: MatchResult;
@@ -17,6 +18,8 @@ export interface ResultScreenProps {
   onSelectSection: (subjectName: string, section: string) => void;
 }
 
+type Tab = 'subjects' | 'exams';
+
 export default function ResultScreen({
   match,
   pdfName,
@@ -24,6 +27,15 @@ export default function ResultScreen({
   onSelectSection,
 }: ResultScreenProps) {
   const insets = useSafeAreaInsets();
+  const [tab, setTab] = useState<Tab>('subjects');
+
+  const examCount = match.subjects.reduce((acc, subject) => {
+    const entry =
+      subject.entries.find((e) => e.seccion === subject.defaultSection) ||
+      subject.entries[0];
+    return acc + (entry?.examenes?.length || 0);
+  }, 0);
+
   return (
     <View style={styles.container}>
       <View style={[styles.topbar, { paddingTop: insets.top + 8 }]}>
@@ -47,13 +59,37 @@ export default function ResultScreen({
         <Text style={styles.count}>
           {match.subjects.length} asignatura{match.subjects.length === 1 ? '' : 's'} del comprobante
         </Text>
-        {match.subjects.map((s) => (
-          <SubjectCard
-            key={`${s.name}|${s.receiptTurno ?? ''}|${s.receiptSeccion ?? ''}|${s.defaultSection ?? ''}`}
-            subject={s}
-            onSelectSection={onSelectSection}
-          />
-        ))}
+
+        <View style={styles.tabRow}>
+          <TouchableOpacity
+            onPress={() => setTab('subjects')}
+            style={[styles.tab, tab === 'subjects' && styles.tabActive]}
+          >
+            <Text style={[styles.tabText, tab === 'subjects' && styles.tabTextActive]}>
+              Por materia
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setTab('exams')}
+            style={[styles.tab, tab === 'exams' && styles.tabActive]}
+          >
+            <Text style={[styles.tabText, tab === 'exams' && styles.tabTextActive]}>
+              Calendario de exámenes{examCount > 0 ? ` (${examCount})` : ''}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {tab === 'subjects' ? (
+          match.subjects.map((s) => (
+            <SubjectCard
+              key={`${s.name}|${s.receiptTurno ?? ''}|${s.receiptSeccion ?? ''}|${s.defaultSection ?? ''}`}
+              subject={s}
+              onSelectSection={onSelectSection}
+            />
+          ))
+        ) : (
+          <ExamCalendar match={match} />
+        )}
       </ScrollView>
     </View>
   );
@@ -118,6 +154,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#33404f',
     marginTop: 8,
+    marginBottom: 12,
+  },
+  tabRow: {
+    flexDirection: 'row',
+    backgroundColor: '#e9edf2',
+    borderRadius: 10,
+    padding: 4,
     marginBottom: 16,
+    gap: 4,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  tabActive: {
+    backgroundColor: '#ffffff',
+    shadowColor: '#0f172a',
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 1,
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#5f6b7a',
+    textAlign: 'center',
+  },
+  tabTextActive: {
+    color: '#1c2733',
   },
 });
