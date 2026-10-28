@@ -1,8 +1,8 @@
-import React, { useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import type { MatchResult } from '../lib/match';
 
-interface CalendarItem {
+interface ExamItem {
   key: string;
   subject: string;
   label: string;
@@ -11,7 +11,32 @@ interface CalendarItem {
   aula: string;
   seccion: string;
   turno: string;
-  dayName?: string;
+  category: string;
+}
+
+interface Category {
+  key: string;
+  title: string;
+}
+
+const CATEGORIES: Category[] = [
+  { key: 'p1', title: 'Primer parcial' },
+  { key: 'p2', title: 'Segundo parcial' },
+  { key: 'f1', title: 'Primer final' },
+  { key: 'f2', title: 'Segundo final' },
+  { key: 'other', title: 'Otros' },
+];
+
+function categoryOf(label: string): string {
+  const l = (label || '').toLowerCase();
+  const isFinal = l.includes('final');
+  const first = l.includes('1ra') || l.includes('1er') || l.includes('primer');
+  const second = l.includes('2da') || l.includes('2do') || l.includes('segund');
+  if (isFinal && first) return 'f1';
+  if (isFinal && second) return 'f2';
+  if (first) return 'p1';
+  if (second) return 'p2';
+  return 'other';
 }
 
 function parseExamDate(dateStr: string): Date | null {
@@ -29,35 +54,36 @@ function parseExamDate(dateStr: string): Date | null {
 function formatDateKey(dateStr: string): string {
   const d = parseExamDate(dateStr);
   if (!d) return dateStr;
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
 
 function formatDateLabel(dateStr: string): string {
   const d = parseExamDate(dateStr);
   if (!d) return dateStr;
   try {
-    return d.toLocaleDateString('es-PY', {
+    const label = d.toLocaleDateString('es-PY', {
       weekday: 'long',
       day: '2-digit',
       month: 'long',
       year: 'numeric',
     });
+    return label.charAt(0).toUpperCase() + label.slice(1);
   } catch {
     return dateStr;
   }
 }
 
-function extractDayName(dateStr: string): string | undefined {
-  const parts = dateStr.trim().split(/\s+/);
-  if (parts.length && /^[A-Za-zÁÉÍÓÚÑáéíóúñ]+$/.test(parts[0])) {
-    return parts[0];
-  }
-  return undefined;
+function formatShortDate(dateStr: string): string {
+  const d = parseExamDate(dateStr);
+  if (!d) return dateStr;
+  return d.toLocaleDateString('es-PY', { day: '2-digit', month: '2-digit' });
 }
 
 export default function ExamCalendar({ match }: { match: MatchResult }) {
+  const [openKey, setOpenKey] = useState<string | null>(null);
+
   const items = useMemo(() => {
-    const list: CalendarItem[] = [];
+    const list: ExamItem[] = [];
 
     for (const subject of match.subjects) {
       const activeEntry =
@@ -76,7 +102,7 @@ export default function ExamCalendar({ match }: { match: MatchResult }) {
           aula: exam.aula,
           seccion: activeEntry.seccion,
           turno: activeEntry.turno,
-          dayName: extractDayName(exam.date),
+          category: categoryOf(exam.label),
         });
       }
     }
@@ -98,9 +124,26 @@ export default function ExamCalendar({ match }: { match: MatchResult }) {
     return list;
   }, [match]);
 
-  const grouped = useMemo(() => {
-    const map = new Map<string, { label: string; items: CalendarItem[] }>();
+  const byCategory = useMemo(() => {
+    const map = new Map<string, ExamItem[]>();
     for (const item of items) {
+      const list = map.get(item.category);
+      if (list) list.push(item);
+      else map.set(item.category, [item]);
+    }
+    return map;
+  }, [items]);
+
+  const visibleCategories = useMemo(
+    () => CATEGORIES.filter((c) => (byCategory.get(c.key)?.length ?? 0) > 0),
+    [byCategory]
+  );
+
+  const activeItems = openKey ? byCategory.get(openKey) || [] : [];
+
+  const groupedByDate = useMemo(() => {
+    const map = new Map<string, { label: string; items: ExamItem[] }>();
+    for (const item of activeItems) {
       const key = formatDateKey(item.date);
       if (!map.has(key)) {
         map.set(key, { label: formatDateLabel(item.date), items: [] });
@@ -108,7 +151,7 @@ export default function ExamCalendar({ match }: { match: MatchResult }) {
       map.get(key)!.items.push(item);
     }
     return Array.from(map.entries());
-  }, [items]);
+  }, [activeItems]);
 
   if (items.length === 0) {
     return (
@@ -123,44 +166,72 @@ export default function ExamCalendar({ match }: { match: MatchResult }) {
 
   return (
     <View style={styles.container}>
-      {grouped.map(([key, group]) => (
-        <View key={key} style={styles.group}>
-          <View style={styles.dateHeader}>
-            <Text style={styles.dateText}>{group.label}</Text>
-          </View>
-          {group.items.map((item) => (
-            <View key={item.key} style={styles.card}>
-              <View style={styles.cardHeader}>
-                <Text style={styles.subject}>{item.subject}</Text>
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{item.label}</Text>
+      <View style={styles.grid}>
+        {visibleCategories.map((category) => {
+          const list = byCategory.get(category.key) || [];
+          const isOpen = openKey === category.key;
+          const firstDate = list.length ? formatShortDate(list[0].date) : '';
+          return (
+            <TouchableOpacity
+              key={category.key}
+              onPress={() => setOpenKey(isOpen ? null : category.key)}
+              style={[styles.typeButton, isOpen && styles.typeButtonActive]}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: isOpen }}
+            >
+              <Text style={[styles.typeTitle, isOpen && styles.typeTitleActive]}>
+                {category.title}
+              </Text>
+              <Text style={[styles.typeMeta, isOpen && styles.typeMetaActive]}>
+                {list.length} {list.length === 1 ? 'fecha' : 'fechas'}
+                {firstDate ? ` · desde ${firstDate}` : ''}
+              </Text>
+              <Text style={[styles.chevron, isOpen && styles.chevronActive]}>
+                {isOpen ? '▲' : '▼'}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {openKey && activeItems.length > 0 ? (
+        <View style={styles.detail}>
+          {groupedByDate.map(([key, group]) => (
+            <View key={key} style={styles.group}>
+              <Text style={styles.dateText}>{group.label}</Text>
+              {group.items.map((item) => (
+                <View key={item.key} style={styles.card}>
+                  <View style={styles.cardHeader}>
+                    <Text style={styles.subject}>{item.subject}</Text>
+                    <Text style={styles.time}>{item.time || '—'}</Text>
+                  </View>
+                  <View style={styles.row}>
+                    <Text style={styles.rowLabel}>Aula</Text>
+                    <Text style={styles.rowValue}>{item.aula || 'No informada'}</Text>
+                  </View>
+                  <View style={styles.row}>
+                    <Text style={styles.rowLabel}>Sección</Text>
+                    <Text style={styles.rowValue}>
+                      {item.seccion} · Turno {item.turno}
+                    </Text>
+                  </View>
+                  <View style={styles.row}>
+                    <Text style={styles.rowLabel}>Examen</Text>
+                    <Text style={styles.rowValue}>{item.label}</Text>
+                  </View>
                 </View>
-              </View>
-              <View style={styles.row}>
-                <Text style={styles.rowLabel}>Horario</Text>
-                <Text style={styles.rowValue}>{item.time || '—'}</Text>
-              </View>
-              <View style={styles.row}>
-                <Text style={styles.rowLabel}>Aula</Text>
-                <Text style={styles.rowValue}>{item.aula || '—'}</Text>
-              </View>
-              <View style={styles.row}>
-                <Text style={styles.rowLabel}>Sección</Text>
-                <Text style={styles.rowValue}>
-                  {item.seccion} · Turno {item.turno}
-                </Text>
-              </View>
+              ))}
             </View>
           ))}
         </View>
-      ))}
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    marginTop: 8,
+    marginTop: 4,
   },
   empty: {
     backgroundColor: '#ffffff',
@@ -180,62 +251,95 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#5f6b7a',
   },
-  group: {
-    marginTop: 20,
-  },
-  dateHeader: {
+  grid: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 10,
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  typeButton: {
+    flexBasis: '47%',
+    flexGrow: 1,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#e3e6ea',
+    minHeight: 92,
+  },
+  typeButtonActive: {
+    backgroundColor: '#0f766e',
+    borderColor: '#0f766e',
+  },
+  typeTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#1c2733',
+  },
+  typeTitleActive: {
+    color: '#ffffff',
+  },
+  typeMeta: {
+    fontSize: 12,
+    color: '#6b7684',
+    marginTop: 4,
+  },
+  typeMetaActive: {
+    color: '#d1fae5',
+  },
+  chevron: {
+    position: 'absolute',
+    right: 12,
+    bottom: 10,
+    fontSize: 11,
+    color: '#94a3b8',
+  },
+  chevronActive: {
+    color: '#d1fae5',
+  },
+  detail: {
+    marginTop: 16,
+  },
+  group: {
+    marginTop: 8,
   },
   dateText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
     color: '#1c2733',
-    textTransform: 'capitalize',
+    marginTop: 12,
+    marginBottom: 8,
   },
   card: {
     backgroundColor: '#ffffff',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    padding: 14,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: '#e3e6ea',
-    shadowColor: '#0f172a',
-    shadowOpacity: 0.02,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
   },
   cardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     gap: 12,
-    marginBottom: 12,
+    marginBottom: 8,
   },
   subject: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
     color: '#1c2733',
   },
-  badge: {
-    backgroundColor: '#f1f5f9',
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  badgeText: {
-    fontSize: 12,
+  time: {
+    fontSize: 14,
     fontWeight: '700',
-    color: '#334155',
+    color: '#0f766e',
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: 5,
     borderTopWidth: 1,
     borderTopColor: '#f0f3f6',
   },
